@@ -12,18 +12,21 @@ import {
   Activity,
   Cuboid,
   Menu,
-  X
+  X,
+  Cpu,
+  Leaf,
+  BarChart3
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: Cuboid },
-  { name: "Digital Twin", href: "/digital-twin", icon: Cuboid },
-  { name: "Maintainance", href: "/maintainance", icon: Cuboid },
-  { name: "Renewable", href: "/renewable", icon: Cuboid },
-  { name: "SimulationTool", href: "/simulation-tool", icon: Cuboid },
-  { name: "Energy", href: "/energy", icon: Cuboid },
-  { name: "IoTSensors", href: "/iot-sensors", icon: Cuboid },
+  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Digital Twin", href: "/digital-twin", icon: Cpu },
+  { name: "Maintainance", href: "/maintainance", icon: Wrench },
+  { name: "Renewable", href: "/renewable", icon: Leaf },
+  { name: "Simulation Tool", href: "/simulation-tool", icon: BarChart3 },
+  { name: "Energy", href: "/energy", icon: Zap },
+  { name: "IoT Sensors", href: "/iot-sensors", icon: Radio },
 ];
 
 export const Sidebar = () => {
