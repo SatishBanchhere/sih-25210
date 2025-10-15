@@ -35,10 +35,18 @@ const CRITICAL_THRESHOLD = 90;
 const HIGH_THRESHOLD = 70;
 const MEDIUM_THRESHOLD = 30;
 
-const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const getRandomFloat = (min, max) => (Math.random() * (max - min) + min).toFixed(2);
+const getRandomInt = (min, max) => {
+    const result = Math.floor(Math.random() * (max - min + 1)) + min;
+    return isNaN(result) ? min : result;
+};
+
+const getRandomFloat = (min, max) => {
+    const result = (Math.random() * (max - min) + min);
+    return isNaN(result) ? min.toFixed(2) : result.toFixed(2);
+};
 
 const getCriticality = (wear) => {
+    if (isNaN(wear) || wear === null || wear === undefined) return 'Low';
     if (wear >= CRITICAL_THRESHOLD) return 'Critical';
     if (wear >= HIGH_THRESHOLD) return 'High';
     if (wear >= MEDIUM_THRESHOLD) return 'Medium';
@@ -54,13 +62,19 @@ const generateHistoricalData = (days = 30) => {
         date.setDate(date.getDate() - i);
         data.push({
             date: date.toISOString().split('T')[0],
-            efficiency: getRandomFloat(70, 95),
-            temperature: getRandomFloat(65, 85),
-            vibration: getRandomFloat(2, 8),
-            pressure: getRandomFloat(45, 65)
+            efficiency: parseFloat(getRandomFloat(70, 95)),
+            temperature: parseFloat(getRandomFloat(65, 85)),
+            vibration: parseFloat(getRandomFloat(2, 8)),
+            pressure: parseFloat(getRandomFloat(45, 65))
         });
     }
     return data;
+};
+
+// Safe number conversion function
+const safeNumber = (value, fallback = 0) => {
+    const num = Number(value);
+    return isNaN(num) || !isFinite(num) ? fallback : num;
 };
 
 // --- ENHANCED INITIAL DATA ---
@@ -211,11 +225,26 @@ const EnhancedPredictiveMaintenance = () => {
         const intervalId = setInterval(() => {
             setEquipmentData(prevData =>
                 prevData.map(asset => {
-                    const newWear = Math.min(100, asset.wearLevel + (asset.criticality === 'Critical' ? getRandomInt(0, 2) : getRandomFloat(0, 0.5)));
-                    const newEfficiency = Math.max(70, Math.min(99, asset.energyEfficiency + getRandomFloat(-2, 1)));
-                    const newTemperature = Math.max(50, Math.min(100, asset.temperature + getRandomFloat(-1, 1)));
-                    const newVibration = Math.max(1, Math.min(10, asset.vibration + getRandomFloat(-0.3, 0.3)));
-                    const newPressure = Math.max(30, Math.min(70, asset.pressure + getRandomFloat(-1, 1)));
+                    const baseWear = safeNumber(asset.wearLevel, 50);
+                    const baseEfficiency = safeNumber(asset.energyEfficiency, 85);
+                    const baseTemperature = safeNumber(asset.temperature, 70);
+                    const baseVibration = safeNumber(asset.vibration, 3);
+                    const basePressure = safeNumber(asset.pressure, 50);
+
+                    const wearIncrement = asset.criticality === 'Critical' ? getRandomInt(0, 2) : parseFloat(getRandomFloat(0, 0.5));
+                    const newWear = Math.min(100, Math.max(0, baseWear + safeNumber(wearIncrement, 0.1)));
+                    
+                    const efficiencyChange = parseFloat(getRandomFloat(-2, 1));
+                    const newEfficiency = Math.max(70, Math.min(99, baseEfficiency + safeNumber(efficiencyChange, 0)));
+                    
+                    const temperatureChange = parseFloat(getRandomFloat(-1, 1));
+                    const newTemperature = Math.max(50, Math.min(100, baseTemperature + safeNumber(temperatureChange, 0)));
+                    
+                    const vibrationChange = parseFloat(getRandomFloat(-0.3, 0.3));
+                    const newVibration = Math.max(1, Math.min(10, baseVibration + safeNumber(vibrationChange, 0)));
+                    
+                    const pressureChange = parseFloat(getRandomFloat(-1, 1));
+                    const newPressure = Math.max(30, Math.min(70, basePressure + safeNumber(pressureChange, 0)));
                     
                     const newCriticality = getCriticality(newWear);
                     let newStatus = asset.status;
@@ -231,12 +260,12 @@ const EnhancedPredictiveMaintenance = () => {
 
                     return {
                         ...asset,
-                        wearLevel: newWear,
+                        wearLevel: safeNumber(newWear, 50),
                         criticality: newCriticality,
-                        energyEfficiency: newEfficiency,
-                        temperature: newTemperature,
-                        vibration: newVibration,
-                        pressure: newPressure,
+                        energyEfficiency: safeNumber(newEfficiency, 85),
+                        temperature: safeNumber(newTemperature, 70),
+                        vibration: safeNumber(newVibration, 3),
+                        pressure: safeNumber(newPressure, 50),
                         status: newStatus,
                         lastUpdated: new Date().getTime(),
                     };
@@ -274,7 +303,7 @@ const EnhancedPredictiveMaintenance = () => {
                         ? { 
                             ...asset, 
                             status: 'Maintenance Scheduled', 
-                            wearLevel: Math.max(20, asset.wearLevel - 10),
+                            wearLevel: Math.max(20, safeNumber(asset.wearLevel, 50) - 10),
                             prediction: `Maintenance scheduled for ${new Date(Date.now() + 24*60*60*1000).toLocaleDateString()}. Team dispatched.`,
                           }
                         : asset
@@ -289,7 +318,7 @@ const EnhancedPredictiveMaintenance = () => {
         setEquipmentData(prevData =>
             prevData.map(asset =>
                 asset.id === assetId
-                    ? { ...asset, status: 'EMERGENCY SHUTDOWN - Offline', wearLevel: asset.wearLevel }
+                    ? { ...asset, status: 'EMERGENCY SHUTDOWN - Offline', wearLevel: safeNumber(asset.wearLevel, 50) }
                     : asset
             )
         );
@@ -330,33 +359,38 @@ const EnhancedPredictiveMaintenance = () => {
             });
     }, [equipmentData, filter, locationFilter, searchTerm]);
 
-    // Statistics calculations
+    // Statistics calculations with NaN protection
     const stats = useMemo(() => {
         const criticalCount = equipmentData.filter(d => d.criticality === 'Critical').length;
         const highCount = equipmentData.filter(d => d.criticality === 'High').length;
         const scheduledCount = equipmentData.filter(d => d.status.includes('Scheduled')).length;
-        const avgEfficiency = (equipmentData.reduce((sum, d) => sum + d.energyEfficiency, 0) / equipmentData.length);
-        const totalDowntime = equipmentData.reduce((sum, d) => sum + d.downtime, 0);
-        const avgTemperature = (equipmentData.reduce((sum, d) => sum + d.temperature, 0) / equipmentData.length);
+        
+        const efficiencySum = equipmentData.reduce((sum, d) => sum + safeNumber(d.energyEfficiency, 85), 0);
+        const avgEfficiency = equipmentData.length > 0 ? efficiencySum / equipmentData.length : 85;
+        
+        const totalDowntime = equipmentData.reduce((sum, d) => sum + safeNumber(d.downtime, 0), 0);
+        
+        const temperatureSum = equipmentData.reduce((sum, d) => sum + safeNumber(d.temperature, 70), 0);
+        const avgTemperature = equipmentData.length > 0 ? temperatureSum / equipmentData.length : 70;
         
         return {
-            criticalCount,
-            highCount,
-            scheduledCount,
-            avgEfficiency: avgEfficiency.toFixed(1),
-            totalDowntime,
-            avgTemperature: avgTemperature.toFixed(1),
+            criticalCount: safeNumber(criticalCount, 0),
+            highCount: safeNumber(highCount, 0),
+            scheduledCount: safeNumber(scheduledCount, 0),
+            avgEfficiency: safeNumber(avgEfficiency, 85).toFixed(1),
+            totalDowntime: safeNumber(totalDowntime, 0),
+            avgTemperature: safeNumber(avgTemperature, 70).toFixed(1),
             operationalCount: equipmentData.filter(d => d.status === 'Operational').length,
-            totalAssets: equipmentData.length
+            totalAssets: equipmentData.length || 6
         };
     }, [equipmentData]);
 
-    // Chart data preparations
+    // Chart data preparations with NaN protection
     const efficiencyChartData = {
-        labels: equipmentData.map(asset => asset.name),
+        labels: equipmentData.map(asset => asset.name || 'Unknown'),
         datasets: [{
             label: 'Efficiency %',
-            data: equipmentData.map(asset => asset.energyEfficiency),
+            data: equipmentData.map(asset => safeNumber(asset.energyEfficiency, 85)),
             backgroundColor: equipmentData.map(asset => {
                 if (asset.criticality === 'Critical') return 'rgba(244, 67, 54, 0.8)';
                 if (asset.criticality === 'High') return 'rgba(255, 152, 0, 0.8)';
@@ -390,10 +424,10 @@ const EnhancedPredictiveMaintenance = () => {
     };
 
     const temperatureChartData = selectedAsset ? {
-        labels: selectedAsset.historicalData.slice(-7).map(d => d.date),
+        labels: selectedAsset.historicalData.slice(-7).map(d => d.date || 'Unknown'),
         datasets: [{
             label: 'Temperature (°C)',
-            data: selectedAsset.historicalData.slice(-7).map(d => d.temperature),
+            data: selectedAsset.historicalData.slice(-7).map(d => safeNumber(d.temperature, 70)),
             borderColor: 'rgb(75, 192, 192)',
             backgroundColor: 'rgba(75, 192, 192, 0.1)',
             tension: 0.4,
@@ -404,13 +438,13 @@ const EnhancedPredictiveMaintenance = () => {
     const radarChartData = selectedAsset ? {
         labels: ['Efficiency', 'Temperature', 'Vibration', 'Pressure', 'Wear Level'],
         datasets: [{
-            label: selectedAsset.name,
+            label: selectedAsset.name || 'Unknown Asset',
             data: [
-                selectedAsset.energyEfficiency,
-                (100 - selectedAsset.temperature), // Inverted for better visualization
-                (10 - selectedAsset.vibration) * 10, // Scaled and inverted
-                selectedAsset.pressure,
-                (100 - selectedAsset.wearLevel) // Inverted
+                safeNumber(selectedAsset.energyEfficiency, 85),
+                (100 - safeNumber(selectedAsset.temperature, 70)), // Inverted for better visualization
+                (10 - safeNumber(selectedAsset.vibration, 3)) * 10, // Scaled and inverted
+                safeNumber(selectedAsset.pressure, 50),
+                (100 - safeNumber(selectedAsset.wearLevel, 50)) // Inverted
             ],
             backgroundColor: 'rgba(54, 162, 235, 0.2)',
             borderColor: 'rgba(54, 162, 235, 1)',
@@ -431,11 +465,11 @@ const EnhancedPredictiveMaintenance = () => {
             </div>
             <div style={statCardBodyStyle}>
                 <p style={statCardValueStyle}>
-                    {value} <span style={statCardUnitStyle}>{unit}</span>
+                    {safeNumber(value, 0)} <span style={statCardUnitStyle}>{unit}</span>
                 </p>
                 {trend && (
                     <span style={{...trendStyle, color: trend > 0 ? '#4CAF50' : '#F44336'}}>
-                        {trend > 0 ? '↗' : '↘'} {Math.abs(trend)}%
+                        {trend > 0 ? '↗' : '↘'} {Math.abs(safeNumber(trend, 0))}%
                     </span>
                 )}
             </div>
@@ -443,12 +477,13 @@ const EnhancedPredictiveMaintenance = () => {
     );
 
     const WearBar = ({ level, criticality, animated = true }) => {
+        const safeLevel = safeNumber(level, 50);
         const barColor = {
             'Critical': '#F44336',
             'High': '#FF9800', 
             'Medium': '#FFEB3B',
             'Low': '#4CAF50'
-        }[criticality];
+        }[criticality] || '#4CAF50';
 
         return (
             <div style={wearBarContainerStyle}>
@@ -456,12 +491,12 @@ const EnhancedPredictiveMaintenance = () => {
                     <div
                         style={{
                             ...wearBarFillStyle,
-                            width: `${Math.min(level, 100)}%`,
+                            width: `${Math.min(Math.max(safeLevel, 0), 100)}%`,
                             backgroundColor: barColor,
                             animation: animated ? `fillBar 1s ease-out` : 'none'
                         }}
                     />
-                    <span style={wearBarLabelStyle}>{level.toFixed(1)}%</span>
+                    <span style={wearBarLabelStyle}>{safeLevel.toFixed(1)}%</span>
                 </div>
                 <div style={wearBarGradientStyle}></div>
             </div>
@@ -513,7 +548,7 @@ const EnhancedPredictiveMaintenance = () => {
             <div style={modalOverlayStyle} onClick={() => setSelectedAsset(null)}>
                 <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
                     <div style={modalHeaderStyle}>
-                        <h2>{selectedAsset.name}</h2>
+                        <h2>{selectedAsset.name || 'Unknown Asset'}</h2>
                         <button 
                             style={closeButtonStyle}
                             onClick={() => setSelectedAsset(null)}
@@ -525,19 +560,19 @@ const EnhancedPredictiveMaintenance = () => {
                         <div style={modalStatsGridStyle}>
                             <div style={modalStatItemStyle}>
                                 <span>Temperature</span>
-                                <strong>{selectedAsset.temperature.toFixed(1)}°C</strong>
+                                <strong>{safeNumber(selectedAsset.temperature, 70).toFixed(1)}°C</strong>
                             </div>
                             <div style={modalStatItemStyle}>
                                 <span>Vibration</span>
-                                <strong>{selectedAsset.vibration.toFixed(1)} mm/s</strong>
+                                <strong>{safeNumber(selectedAsset.vibration, 3).toFixed(1)} mm/s</strong>
                             </div>
                             <div style={modalStatItemStyle}>
                                 <span>Pressure</span>
-                                <strong>{selectedAsset.pressure.toFixed(1)} bar</strong>
+                                <strong>{safeNumber(selectedAsset.pressure, 50).toFixed(1)} bar</strong>
                             </div>
                             <div style={modalStatItemStyle}>
                                 <span>Operating Hours</span>
-                                <strong>{selectedAsset.operatingHours.toLocaleString()}</strong>
+                                <strong>{safeNumber(selectedAsset.operatingHours, 1000).toLocaleString()}</strong>
                             </div>
                         </div>
                         
@@ -768,44 +803,44 @@ const EnhancedPredictiveMaintenance = () => {
                                     <div key={asset.id} style={assetCardStyle(asset.criticality)} className="asset-card">
                                         <div style={assetCardHeaderStyle}>
                                             <h3 style={assetCardTitleStyle}>
-                                                {asset.name} 
-                                                <span style={assetIDStyle}>({asset.id})</span>
+                                                {asset.name || 'Unknown Equipment'} 
+                                                <span style={assetIDStyle}>({asset.id || 'N/A'})</span>
                                             </h3>
                                             <div style={assetMetaStyle}>
-                                                <span style={locationBadgeStyle}>{asset.location}</span>
-                                                <span style={statusBadgeStyle(asset.status)}>{asset.status}</span>
+                                                <span style={locationBadgeStyle}>{asset.location || 'Unknown'}</span>
+                                                <span style={statusBadgeStyle(asset.status)}>{asset.status || 'Unknown'}</span>
                                             </div>
                                         </div>
 
                                         <div style={assetBodyStyle}>
                                             <div style={wearPredictionContainerStyle}>
                                                 <p style={wearPredictionHeaderStyle}>Component Wear Level</p>
-                                                <WearBar level={asset.wearLevel} criticality={asset.criticality} />
+                                                <WearBar level={safeNumber(asset.wearLevel, 50)} criticality={asset.criticality} />
                                             </div>
 
                                             <div style={sensorDataGridStyle}>
                                                 <div style={sensorItemStyle}>
-                                                    <span>🌡️ {asset.temperature.toFixed(1)}°C</span>
+                                                    <span>🌡️ {safeNumber(asset.temperature, 70).toFixed(1)}°C</span>
                                                 </div>
                                                 <div style={sensorItemStyle}>
-                                                    <span>📳 {asset.vibration.toFixed(1)} mm/s</span>
+                                                    <span>📳 {safeNumber(asset.vibration, 3).toFixed(1)} mm/s</span>
                                                 </div>
                                                 <div style={sensorItemStyle}>
-                                                    <span>🔘 {asset.pressure.toFixed(1)} bar</span>
+                                                    <span>🔘 {safeNumber(asset.pressure, 50).toFixed(1)} bar</span>
                                                 </div>
                                                 <div style={sensorItemStyle}>
-                                                    <span>⚡ {asset.energyEfficiency.toFixed(1)}%</span>
+                                                    <span>⚡ {safeNumber(asset.energyEfficiency, 85).toFixed(1)}%</span>
                                                 </div>
                                             </div>
 
                                             <p style={assetPredictionStyle}>
-                                                <strong>🔮 AI Prediction:</strong> {asset.prediction}
+                                                <strong>🔮 AI Prediction:</strong> {asset.prediction || 'No prediction available'}
                                             </p>
 
                                             <div style={detailsRowStyle}>
-                                                <span>Last: {asset.lastMaintenance}</span>
-                                                <span>Next: {asset.nextMaintenance}</span>
-                                                <span>Hours: {asset.operatingHours.toLocaleString()}</span>
+                                                <span>Last: {asset.lastMaintenance || 'N/A'}</span>
+                                                <span>Next: {asset.nextMaintenance || 'N/A'}</span>
+                                                <span>Hours: {safeNumber(asset.operatingHours, 1000).toLocaleString()}</span>
                                             </div>
                                         </div>
 
@@ -880,10 +915,10 @@ const EnhancedPredictiveMaintenance = () => {
                         <div style={chartCardStyle}>
                             <h3>Maintenance Cost Analysis</h3>
                             <Bar data={{
-                                labels: equipmentData.map(asset => asset.name),
+                                labels: equipmentData.map(asset => asset.name || 'Unknown'),
                                 datasets: [{
                                     label: 'Maintenance Cost ($)',
-                                    data: equipmentData.map(asset => asset.maintenanceCost),
+                                    data: equipmentData.map(asset => safeNumber(asset.maintenanceCost, 10000)),
                                     backgroundColor: 'rgba(156, 39, 176, 0.8)',
                                     borderColor: 'rgba(156, 39, 176, 1)',
                                     borderWidth: 2
@@ -893,10 +928,10 @@ const EnhancedPredictiveMaintenance = () => {
                         <div style={chartCardStyle}>
                             <h3>Downtime Analysis</h3>
                             <Bar data={{
-                                labels: equipmentData.map(asset => asset.name),
+                                labels: equipmentData.map(asset => asset.name || 'Unknown'),
                                 datasets: [{
                                     label: 'Downtime (hours)',
-                                    data: equipmentData.map(asset => asset.downtime),
+                                    data: equipmentData.map(asset => safeNumber(asset.downtime, 5)),
                                     backgroundColor: 'rgba(255, 87, 34, 0.8)',
                                     borderColor: 'rgba(255, 87, 34, 1)',
                                     borderWidth: 2
@@ -915,7 +950,7 @@ const EnhancedPredictiveMaintenance = () => {
     );
 };
 
-// --- ENHANCED STYLING ---
+// ... [All the existing style objects remain the same] ...
 
 const dashboardContainerStyle = {
     fontFamily: "'Inter', 'Roboto', Arial, sans-serif",
