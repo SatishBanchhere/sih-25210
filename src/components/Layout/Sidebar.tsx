@@ -61,10 +61,10 @@ export const Sidebar = () => {
         </div>
         <div className="flex-1 min-w-0">
           <h1 
-            className="text-sm md:text-lg font-bold truncate"
+            className="text-sm md:text-md font-bold truncate"
             style={{ color: '#5D5A52' }}
           >
-            Smart/AI-driven optimization
+            Smart/AI-driven crush
           </h1>
           <p 
             className="text-xs"
